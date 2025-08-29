@@ -1,0 +1,1184 @@
+// CreditAqua Microfinance Tank Leasing Platform - Complete DBML Schema
+// Laravel 12 with Spatie Permissions and Polymorphic Relationships
+
+// ===== AUTHENTICATION & PERMISSIONS =====
+
+Table users {
+  id bigint [pk, increment]
+  name varchar(255)
+  email varchar(255) [unique]
+  email_verified_at timestamp [null]
+  password varchar(255)
+  remember_token varchar(100) [null]
+  current_team_id bigint [null]
+  profile_photo_path varchar(2048) [null]
+  user_type enum('admin', 'manufacturer', 'client') [default: 'client']
+  status enum('active', 'inactive', 'suspended', 'pending') [default: 'pending']
+  last_login_at timestamp [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+// Spatie Permission Tables
+Table permissions {
+  id bigint [pk, increment]
+  name varchar(255) [unique]
+  guard_name varchar(255)
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table roles {
+  id bigint [pk, increment]
+  name varchar(255) [unique]
+  guard_name varchar(255)
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table model_has_permissions {
+  permission_id bigint [ref: > permissions.id]
+  model_type varchar(255)
+  model_id bigint
+
+  indexes {
+    (permission_id, model_id, model_type) [pk]
+    (model_id, model_type)
+  }
+}
+
+Table model_has_roles {
+  role_id bigint [ref: > roles.id]
+  model_type varchar(255)
+  model_id bigint
+
+  indexes {
+    (role_id, model_id, model_type) [pk]
+    (model_id, model_type)
+  }
+}
+
+Table role_has_permissions {
+  permission_id bigint [ref: > permissions.id]
+  role_id bigint [ref: > roles.id]
+
+  indexes {
+    (permission_id, role_id) [pk]
+  }
+}
+
+Table password_reset_tokens {
+  email varchar(255) [pk]
+  token varchar(255)
+  created_at timestamp [null]
+}
+
+Table sessions {
+  id varchar(255) [pk]
+  user_id bigint [null, ref: > users.id]
+  ip_address varchar(45) [null]
+  user_agent text [null]
+  payload longtext
+  last_activity int
+
+  indexes {
+    (user_id)
+    (last_activity)
+  }
+}
+
+// ===== POLYMORPHIC SUPPORTING TABLES =====
+
+// Polymorphic Documents
+Table documents {
+  id bigint [pk, increment]
+  documentable_type varchar(255)
+  documentable_id bigint
+  document_type enum('kyc_id', 'business_license', 'tax_certificate', 'bank_statement', 'agreement', 'invoice', 'receipt', 'guarantee', 'other')
+  title varchar(255)
+  description text [null]
+  file_path varchar(500)
+  file_name varchar(255)
+  file_size bigint
+  mime_type varchar(100)
+  document_number varchar(100) [null]
+  issue_date date [null]
+  expiry_date date [null]
+  status enum('pending', 'approved', 'rejected', 'expired') [default: 'pending']
+  uploaded_by bigint [ref: > users.id]
+  verified_by bigint [null, ref: > users.id]
+  verified_at timestamp [null]
+  remarks text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (documentable_type, documentable_id)
+    (document_type)
+    (status)
+  }
+}
+
+// Polymorphic Addresses
+Table addresses {
+  id bigint [pk, increment]
+  addressable_type varchar(255)
+  addressable_id bigint
+  address_type enum('primary', 'billing', 'shipping', 'delivery', 'warehouse', 'office', 'residence') [default: 'primary']
+  label varchar(100) [null]
+  address_line_1 varchar(500)
+  address_line_2 varchar(500) [null]
+  city varchar(100)
+  state varchar(100)
+  postal_code varchar(20)
+  country varchar(100) [default: 'Uganda']
+  latitude decimal(10,8) [null]
+  longitude decimal(11,8) [null]
+  is_default boolean [default: false]
+  is_verified boolean [default: false]
+  verified_at timestamp [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (addressable_type, addressable_id)
+    (address_type)
+    (city)
+    (state)
+  }
+}
+
+// Polymorphic Comments/Notes
+Table comments {
+  id bigint [pk, increment]
+  commentable_type varchar(255)
+  commentable_id bigint
+  user_id bigint [ref: > users.id]
+  parent_id bigint [null, ref: > comments.id]
+  comment_type enum('note', 'status_change', 'reminder', 'follow_up', 'issue', 'resolution')
+  title varchar(255) [null]
+  content text
+  priority enum('low', 'medium', 'high', 'urgent') [default: 'medium']
+  is_internal boolean [default: true]
+  is_pinned boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (commentable_type, commentable_id)
+    (user_id)
+    (comment_type)
+    (created_at)
+  }
+}
+
+// Polymorphic Attachments/Files
+Table attachments {
+  id bigint [pk, increment]
+  attachable_type varchar(255)
+  attachable_id bigint
+  file_type enum('image', 'document', 'video', 'audio', 'other')
+  title varchar(255)
+  description text [null]
+  file_path varchar(500)
+  file_name varchar(255)
+  original_name varchar(255)
+  file_size bigint
+  mime_type varchar(100)
+  uploaded_by bigint [ref: > users.id]
+  is_public boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (attachable_type, attachable_id)
+    (file_type)
+    (uploaded_by)
+  }
+}
+
+// Spatie Activity Log (Polymorphic)
+Table activity_log {
+  id bigint [pk, increment]
+  log_name varchar(255) [null]
+  description text
+  subject_type varchar(255) [null]
+  event varchar(255) [null]
+  subject_id bigint [null]
+  causer_type varchar(255) [null]
+  causer_id bigint [null]
+  properties json [null]
+  batch_uuid uuid [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (subject_type, subject_id)
+    (causer_type, causer_id)
+    (log_name)
+    (created_at)
+  }
+}
+
+// ===== MANUFACTURER MANAGEMENT =====
+
+Table manufacturers {
+  id bigint [pk, increment]
+  user_id bigint [unique, ref: - users.id]
+  company_name varchar(255)
+  company_registration_number varchar(100) [unique]
+  business_type enum('sole_proprietorship', 'partnership', 'limited_company', 'corporation')
+  industry varchar(100)
+  tax_identification_number varchar(100) [null]
+  website varchar(255) [null]
+  established_year int [null]
+  employee_count_range enum('1-10', '11-50', '51-200', '201-500', '500+') [null]
+  description text [null]
+  logo_path varchar(500) [null]
+  status enum('pending', 'active', 'suspended', 'inactive') [default: 'pending']
+  verification_status enum('unverified', 'under_review', 'verified', 'rejected') [default: 'unverified']
+  verified_at timestamp [null]
+  verified_by bigint [null, ref: > users.id]
+  commission_rate decimal(5,2) [default: 0.00] // Percentage
+  credit_limit decimal(15,2) [default: 0.00]
+  payment_terms int [default: 30] // Days
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (status)
+    (verification_status)
+    (company_name)
+  }
+}
+
+Table manufacturer_contacts {
+  id bigint [pk, increment]
+  manufacturer_id bigint [ref: > manufacturers.id]
+  contact_type enum('primary', 'secondary', 'finance', 'technical', 'sales')
+  name varchar(255)
+  title varchar(100) [null]
+  email varchar(255) [null]
+  phone varchar(50) [null]
+  is_primary boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table product_categories {
+  id bigint [pk, increment]
+  name varchar(255)
+  slug varchar(255) [unique]
+  description text [null]
+  parent_id bigint [null, ref: > product_categories.id]
+  image_path varchar(500) [null]
+  is_active boolean [default: true]
+  sort_order int [default: 0]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table products {
+  id bigint [pk, increment]
+  manufacturer_id bigint [ref: > manufacturers.id]
+  category_id bigint [ref: > product_categories.id]
+  name varchar(255)
+  slug varchar(255)
+  sku varchar(100) [unique]
+  description text [null]
+  specifications json [null] // Tank capacity, material, dimensions, etc.
+  unit_price decimal(15,2)
+  lease_price decimal(15,2)
+  currency varchar(3) [default: 'UGX']
+  minimum_lease_duration int [default: 12] // months
+  maximum_lease_duration int [default: 60] // months
+  warranty_period int [default: 12] // months
+  maintenance_required boolean [default: false]
+  installation_required boolean [default: true]
+  weight_kg decimal(8,2) [null]
+  dimensions_cm varchar(50) [null] // L×W×H format
+  color varchar(50) [null]
+  material varchar(100) [null]
+  capacity_liters int [null]
+  images json [null] // Array of image paths
+  status enum('draft', 'active', 'inactive', 'discontinued') [default: 'draft']
+  is_featured boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (manufacturer_id)
+    (category_id)
+    (status)
+    (sku)
+  }
+}
+
+Table inventory {
+  id bigint [pk, increment]
+  product_id bigint [ref: > products.id]
+  location varchar(255) [null]
+  quantity_available int [default: 0]
+  quantity_reserved int [default: 0]
+  quantity_leased int [default: 0]
+  reorder_level int [default: 0]
+  last_restocked_at timestamp [null]
+  notes text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (product_id)
+    (quantity_available)
+  }
+}
+
+// ===== CLIENT MANAGEMENT =====
+
+Table clients {
+  id bigint [pk, increment]
+  user_id bigint [unique, ref: - users.id]
+  client_code varchar(50) [unique]
+  client_type enum('individual', 'business', 'cooperative', 'ngo')
+  title enum('Mr', 'Mrs', 'Ms', 'Dr', 'Prof') [null]
+  first_name varchar(255)
+  middle_name varchar(255) [null]
+  last_name varchar(255)
+  business_name varchar(255) [null]
+  date_of_birth date [null]
+  gender enum('male', 'female', 'other') [null]
+  marital_status enum('single', 'married', 'divorced', 'widowed') [null]
+  id_type enum('national_id', 'passport', 'driving_license')
+  id_number varchar(100) [unique]
+  phone_primary varchar(50)
+  phone_secondary varchar(50) [null]
+  email_secondary varchar(255) [null]
+  occupation varchar(100) [null]
+  employer varchar(255) [null]
+  monthly_income decimal(15,2) [null]
+  bank_name varchar(100) [null]
+  bank_account_number varchar(50) [null]
+  mobile_money_provider varchar(50) [null]
+  mobile_money_number varchar(50) [null]
+  preferred_payment_method enum('bank_transfer', 'mobile_money', 'cash', 'cheque') [default: 'mobile_money']
+  kyc_status enum('incomplete', 'pending', 'approved', 'rejected') [default: 'incomplete']
+  kyc_completed_at timestamp [null]
+  credit_score int [null]
+  risk_rating enum('low', 'medium', 'high') [null]
+  status enum('active', 'inactive', 'blacklisted', 'suspended') [default: 'active']
+  registration_source enum('online', 'agent', 'walk_in', 'referral')
+  referred_by bigint [null, ref: > clients.id]
+  notes text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (client_code)
+    (id_number)
+    (kyc_status)
+    (status)
+    (phone_primary)
+  }
+}
+
+Table client_references {
+  id bigint [pk, increment]
+  client_id bigint [ref: > clients.id]
+  reference_type enum('personal', 'professional', 'family', 'neighbor', 'business')
+  name varchar(255)
+  relationship varchar(100)
+  phone varchar(50)
+  email varchar(255) [null]
+  address text [null]
+  occupation varchar(100) [null]
+  years_known int [null]
+  is_contacted boolean [default: false]
+  contact_notes text [null]
+  verification_status enum('pending', 'verified', 'failed') [default: 'pending']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table client_dependents {
+  id bigint [pk, increment]
+  client_id bigint [ref: > clients.id]
+  name varchar(255)
+  relationship varchar(50)
+  age int
+  is_employed boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+// ===== LEASE MANAGEMENT =====
+
+Table lease_applications {
+  id bigint [pk, increment]
+  application_number varchar(50) [unique]
+  client_id bigint [ref: > clients.id]
+  product_id bigint [ref: > products.id]
+  quantity int [default: 1]
+  lease_duration_months int
+  monthly_payment decimal(15,2)
+  total_lease_amount decimal(15,2)
+  down_payment decimal(15,2) [default: 0.00]
+  security_deposit decimal(15,2) [default: 0.00]
+  application_fee decimal(15,2) [default: 0.00]
+  delivery_address text
+  preferred_delivery_date date [null]
+  purpose_of_lease text
+  collateral_description text [null]
+  guarantor_required boolean [default: false]
+  employment_verification boolean [default: false]
+  income_verification boolean [default: false]
+  status enum('draft', 'submitted', 'under_review', 'approved', 'rejected', 'cancelled') [default: 'draft']
+  risk_assessment_score decimal(5,2) [null]
+  assessment_notes text [null]
+  submitted_at timestamp [null]
+  reviewed_at timestamp [null]
+  reviewed_by bigint [null, ref: > users.id]
+  approval_notes text [null]
+  rejection_reason text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (application_number)
+    (client_id)
+    (status)
+    (submitted_at)
+  }
+}
+
+Table guarantors {
+  id bigint [pk, increment]
+  lease_application_id bigint [ref: > lease_applications.id]
+  name varchar(255)
+  id_type enum('national_id', 'passport', 'driving_license')
+  id_number varchar(100)
+  phone varchar(50)
+  email varchar(255) [null]
+  occupation varchar(100)
+  employer varchar(255) [null]
+  monthly_income decimal(15,2) [null]
+  relationship_to_client varchar(100)
+  guarantee_amount decimal(15,2)
+  consent_given boolean [default: false]
+  consent_date timestamp [null]
+  verification_status enum('pending', 'verified', 'rejected') [default: 'pending']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table lease_agreements {
+  id bigint [pk, increment]
+  agreement_number varchar(50) [unique]
+  lease_application_id bigint [unique, ref: - lease_applications.id]
+  client_id bigint [ref: > clients.id]
+  product_id bigint [ref: > products.id]
+  manufacturer_id bigint [ref: > manufacturers.id]
+  quantity int
+  lease_start_date date
+  lease_end_date date
+  lease_duration_months int
+  monthly_payment decimal(15,2)
+  total_lease_amount decimal(15,2)
+  down_payment decimal(15,2)
+  security_deposit decimal(15,2)
+  late_fee_percentage decimal(5,2) [default: 5.00]
+  grace_period_days int [default: 5]
+  early_termination_fee decimal(15,2) [null]
+  maintenance_responsibility enum('client', 'manufacturer', 'shared') [default: 'client']
+  insurance_required boolean [default: false]
+  insurance_provider varchar(255) [null]
+  terms_and_conditions text
+  special_terms text [null]
+  status enum('draft', 'active', 'completed', 'terminated', 'breached') [default: 'draft']
+  signed_by_client boolean [default: false]
+  signed_by_manufacturer boolean [default: false]
+  client_signature_date timestamp [null]
+  manufacturer_signature_date timestamp [null]
+  witness_name varchar(255) [null]
+  witness_signature_date timestamp [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (agreement_number)
+    (client_id)
+    (status)
+    (lease_start_date)
+    (lease_end_date)
+  }
+}
+
+Table payment_schedules {
+  id bigint [pk, increment]
+  lease_agreement_id bigint [ref: > lease_agreements.id]
+  installment_number int
+  due_date date
+  principal_amount decimal(15,2)
+  interest_amount decimal(15,2) [default: 0.00]
+  total_amount decimal(15,2)
+  status enum('pending', 'paid', 'partial', 'overdue', 'waived') [default: 'pending']
+  paid_amount decimal(15,2) [default: 0.00]
+  paid_date date [null]
+  late_fee decimal(15,2) [default: 0.00]
+  notes text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (lease_agreement_id, installment_number) [unique]
+    (due_date)
+    (status)
+  }
+}
+
+// ===== DELIVERY & LOGISTICS =====
+
+<!--Table delivery_zones {
+  id bigint [pk, increment]
+  name varchar(255)
+  description text [null]
+  coverage_area text // Geographic description
+  delivery_fee decimal(10,2) [default: 0.00]
+  delivery_duration_days int [default: 7]
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table delivery_agents {
+  id bigint [pk, increment]
+  name varchar(255)
+  phone varchar(50)
+  email varchar(255) [null]
+  license_number varchar(100) [null]
+  vehicle_type varchar(100)
+  vehicle_registration varchar(100) [null]
+  zone_id bigint [null, ref: > delivery_zones.id]
+  status enum('active', 'inactive', 'suspended') [default: 'active']
+  rating decimal(3,2) [default: 0.00] // Out of 5
+  total_deliveries int [default: 0]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table deliveries {
+  id bigint [pk, increment]
+  delivery_number varchar(50) [unique]
+  lease_agreement_id bigint [ref: > lease_agreements.id]
+  delivery_agent_id bigint [null, ref: > delivery_agents.id]
+  delivery_zone_id bigint [null, ref: > delivery_zones.id]
+  delivery_type enum('installation', 'maintenance', 'pickup', 'replacement')
+  scheduled_date date
+  scheduled_time_start time [null]
+  scheduled_time_end time [null]
+  actual_delivery_date date [null]
+  actual_delivery_time time [null]
+  delivery_fee decimal(10,2) [default: 0.00]
+  installation_fee decimal(10,2) [default: 0.00]
+  delivery_instructions text [null]
+  special_requirements text [null]
+  status enum('scheduled', 'in_transit', 'delivered', 'failed', 'cancelled', 'rescheduled') [default: 'scheduled']
+  proof_of_delivery text [null] // Photo paths, signatures
+  recipient_name varchar(255) [null]
+  recipient_phone varchar(50) [null]
+  delivery_notes text [null]
+  rating int [null] // 1-5 stars
+  feedback text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (delivery_number)
+    (lease_agreement_id)
+    (scheduled_date)
+    (status)
+  }
+}
+
+Table delivery_tracking {
+  id bigint [pk, increment]
+  delivery_id bigint [ref: > deliveries.id]
+  status enum('scheduled', 'picked_up', 'in_transit', 'out_for_delivery', 'delivered', 'failed', 'returned')
+  location varchar(255) [null]
+  latitude decimal(10,8) [null]
+  longitude decimal(11,8) [null]
+  notes text [null]
+  updated_by bigint [null, ref: > users.id]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    (delivery_id, created_at)
+    (status)
+  }
+}-->
+
+// ===== FINANCIAL MANAGEMENT =====
+
+Table payments {
+  id bigint [pk, increment]
+  payment_reference varchar(100) [unique]
+  lease_agreement_id bigint [ref: > lease_agreements.id]
+  payment_schedule_id bigint [null, ref: > payment_schedules.id]
+  client_id bigint [ref: > clients.id]
+  payment_type enum('down_payment', 'installment', 'late_fee', 'security_deposit', 'early_termination', 'other')
+  amount decimal(15,2)
+  currency varchar(3) [default: 'UGX']
+  payment_method enum('cash', 'bank_transfer', 'mobile_money', 'cheque', 'card')
+  payment_channel varchar(100) [null] // MTN, Airtel, Bank name, etc.
+  transaction_reference varchar(255) [null]
+  external_reference varchar(255) [null] // Third-party payment ref
+  payment_date date
+  due_date date [null]
+  status enum('pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded') [default: 'pending']
+  processing_fee decimal(10,2) [default: 0.00]
+  net_amount decimal(15,2)
+  confirmation_code varchar(100) [null]
+  receipt_number varchar(100) [null]
+  notes text [null]
+  processed_by bigint [null, ref: > users.id]
+  processed_at timestamp [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (payment_reference)
+    (lease_agreement_id)
+    (client_id)
+    (payment_date)
+    (status)
+  }
+}
+
+Table payment_methods {
+  id bigint [pk, increment]
+  client_id bigint [ref: > clients.id]
+  method_type enum('bank_account', 'mobile_money', 'card')
+  provider varchar(100) // Bank name, MTN, Airtel, etc.
+  account_number varchar(100)
+  account_name varchar(255)
+  is_default boolean [default: false]
+  is_verified boolean [default: false]
+  status enum('active', 'inactive', 'blocked') [default: 'active']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table commissions {
+  id bigint [pk, increment]
+  manufacturer_id bigint [ref: > manufacturers.id]
+  lease_agreement_id bigint [ref: > lease_agreements.id]
+  payment_id bigint [null, ref: > payments.id]
+  commission_type enum('lease_commission', 'maintenance_commission', 'bonus')
+  base_amount decimal(15,2)
+  commission_rate decimal(5,2)
+  commission_amount decimal(15,2)
+  currency varchar(3) [default: 'UGX']
+  status enum('pending', 'approved', 'paid', 'cancelled') [default: 'pending']
+  calculation_date date
+  due_date date
+  paid_date date [null]
+  payment_reference varchar(255) [null]
+  notes text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (manufacturer_id)
+    (lease_agreement_id)
+    (status)
+    (due_date)
+  }
+}
+
+Table accounts {
+  id bigint [pk, increment]
+  account_code varchar(20) [unique]
+  account_name varchar(255)
+  account_type enum('asset', 'liability', 'equity', 'income', 'expense')
+  parent_id bigint [null, ref: > accounts.id]
+  balance decimal(15,2) [default: 0.00]
+  is_active boolean [default: true]
+  description text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table journal_entries {
+  id bigint [pk, increment]
+  entry_number varchar(50) [unique]
+  transaction_date date
+  reference_type varchar(255) [null] // Model class name
+  reference_id bigint [null] // Model ID
+  description text
+  total_debit decimal(15,2)
+  total_credit decimal(15,2)
+  status enum('draft', 'posted', 'reversed') [default: 'draft']
+  created_by bigint [ref: > users.id]
+  posted_by bigint [null, ref: > users.id]
+  posted_at timestamp [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (entry_number)
+    (transaction_date)
+    (reference_type, reference_id)
+    (status)
+  }
+}
+
+Table journal_entry_lines {
+  id bigint [pk, increment]
+  journal_entry_id bigint [ref: > journal_entries.id]
+  account_id bigint [ref: > accounts.id]
+  description text [null]
+  debit_amount decimal(15,2) [default: 0.00]
+  credit_amount decimal(15,2) [default: 0.00]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+// ===== COMMUNICATION & NOTIFICATIONS =====
+
+Table notification_templates {
+  id bigint [pk, increment]
+  name varchar(255) [unique]
+  type enum('email', 'sms', 'push', 'system')
+  event_trigger varchar(255) // Event that triggers this template
+  subject varchar(500) [null]
+  content text
+  variables json [null] // Available template variables
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table notifications {
+  id bigint [pk, increment]
+  type enum('email', 'sms', 'push', 'system')
+  notifiable_type varchar(255)
+  notifiable_id bigint
+  data json
+  read_at timestamp [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (notifiable_type, notifiable_id)
+    (read_at)
+    (created_at)
+  }
+}
+
+Table messages {
+  id bigint [pk, increment]
+  sender_id bigint [ref: > users.id]
+  recipient_id bigint [ref: > users.id]
+  subject varchar(500) [null]
+  body text
+  message_type enum('system', 'user', 'automated')
+  priority enum('low', 'normal', 'high', 'urgent') [default: 'normal']
+  status enum('draft', 'sent', 'delivered', 'read', 'failed') [default: 'draft']
+  read_at timestamp [null]
+  parent_id bigint [null, ref: > messages.id]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (sender_id)
+    (recipient_id)
+    (status)
+    (created_at)
+  }
+}
+
+Table sms_logs {
+  id bigint [pk, increment]
+  recipient varchar(50)
+  message text
+  status enum('pending', 'sent', 'delivered', 'failed')
+  provider varchar(100) [null]
+  external_id varchar(255) [null]
+  cost decimal(8,4) [null]
+  error_message text [null]
+  sent_at timestamp [null]
+  delivered_at timestamp [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (recipient)
+    (status)
+    (sent_at)
+  }
+}
+
+Table email_logs {
+  id bigint [pk, increment]
+  recipient varchar(255)
+  subject varchar(500)
+  body text
+  status enum('pending', 'sent', 'delivered', 'failed', 'bounced')
+  provider varchar(100) [null]
+  external_id varchar(255) [null]
+  error_message text [null]
+  sent_at timestamp [null]
+  delivered_at timestamp [null]
+  opened_at timestamp [null]
+  clicked_at timestamp [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (recipient)
+    (status)
+    (sent_at)
+  }
+}
+
+// ===== REPORTING & ANALYTICS =====
+
+Table reports {
+  id bigint [pk, increment]
+  name varchar(255)
+  description text [null]
+  report_type enum('financial', 'operational', 'client', 'manufacturer', 'custom')
+  parameters json [null]
+  schedule_frequency enum('once', 'daily', 'weekly', 'monthly', 'quarterly', 'yearly') [null]
+  next_run_at timestamp [null]
+  last_run_at timestamp [null]
+  is_active boolean [default: true]
+  created_by bigint [ref: > users.id]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table report_executions {
+  id bigint [pk, increment]
+  report_id bigint [ref: > reports.id]
+  status enum('pending', 'running', 'completed', 'failed')
+  file_path varchar(500) [null]
+  file_size bigint [null]
+  execution_time_seconds int [null]
+  error_message text [null]
+  parameters_used json [null]
+  executed_by bigint [null, ref: > users.id]
+  started_at timestamp [null]
+  completed_at timestamp [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (report_id)
+    (status)
+    (created_at)
+  }
+}
+
+Table analytics_events {
+  id bigint [pk, increment]
+  event_name varchar(255)
+  event_type enum('page_view', 'user_action', 'system_event', 'business_metric')
+  user_id bigint [null, ref: > users.id]
+  session_id varchar(255) [null]
+  properties json [null]
+  metadata json [null]
+  ip_address varchar(45) [null]
+  user_agent text [null]
+  occurred_at timestamp [default: `now()`]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    (event_name)
+    (event_type)
+    (user_id)
+    (occurred_at)
+  }
+}
+
+// ===== SYSTEM CONFIGURATION =====
+
+Table settings {
+  id bigint [pk, increment]
+  key varchar(255) [unique]
+  value text
+  type enum('string', 'integer', 'decimal', 'boolean', 'json')
+  group_name varchar(100) [null]
+  description text [null]
+  is_public boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table currencies {
+  id bigint [pk, increment]
+  code varchar(3) [unique]
+  name varchar(255)
+  symbol varchar(10)
+  exchange_rate decimal(10,4) [default: 1.0000]
+  is_default boolean [default: false]
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table audit_trails {
+  id bigint [pk, increment]
+  user_id bigint [null, ref: > users.id]
+  action varchar(255)
+  auditable_type varchar(255)
+  auditable_id bigint
+  old_values json [null]
+  new_values json [null]
+  url varchar(500) [null]
+  ip_address varchar(45) [null]
+  user_agent text [null]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    (user_id)
+    (auditable_type, auditable_id)
+    (action)
+    (created_at)
+  }
+}
+
+Table system_logs {
+  id bigint [pk, increment]
+  level enum('emergency', 'alert', 'critical', 'error', 'warning', 'notice', 'info', 'debug')
+  message text
+  context json [null]
+  channel varchar(255) [null]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    (level)
+    (channel)
+    (created_at)
+  }
+}
+
+// ===== ADDITIONAL BUSINESS FEATURES =====
+
+Table maintenance_schedules {
+  id bigint [pk, increment]
+  lease_agreement_id bigint [ref: > lease_agreements.id]
+  maintenance_type enum('routine', 'preventive', 'corrective', 'emergency')
+  description text
+  scheduled_date date
+  frequency_months int [null] // For recurring maintenance
+  estimated_cost decimal(10,2) [null]
+  actual_cost decimal(10,2) [null]
+  status enum('scheduled', 'in_progress', 'completed', 'cancelled', 'overdue') [default: 'scheduled']
+  assigned_to varchar(255) [null]
+  completion_date date [null]
+  notes text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (lease_agreement_id)
+    (scheduled_date)
+    (status)
+  }
+}
+
+Table insurance_policies {
+  id bigint [pk, increment]
+  lease_agreement_id bigint [ref: > lease_agreements.id]
+  policy_number varchar(100) [unique]
+  insurance_provider varchar(255)
+  policy_type enum('comprehensive', 'third_party', 'fire_theft')
+  coverage_amount decimal(15,2)
+  premium_amount decimal(10,2)
+  start_date date
+  end_date date
+  status enum('active', 'expired', 'cancelled') [default: 'active']
+  beneficiary varchar(255)
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (lease_agreement_id)
+    (policy_number)
+    (status)
+    (end_date)
+  }
+}
+
+Table late_payment_notices {
+  id bigint [pk, increment]
+  payment_schedule_id bigint [ref: > payment_schedules.id]
+  lease_agreement_id bigint [ref: > lease_agreements.id]
+  client_id bigint [ref: > clients.id]
+  notice_type enum('reminder', 'first_notice', 'second_notice', 'final_notice', 'legal_notice')
+  days_overdue int
+  outstanding_amount decimal(15,2)
+  late_fee_charged decimal(10,2) [default: 0.00]
+  notice_date date
+  response_due_date date [null]
+  status enum('sent', 'acknowledged', 'resolved', 'escalated') [default: 'sent']
+  delivery_method enum('sms', 'email', 'physical', 'phone_call')
+  sent_by bigint [ref: > users.id]
+  acknowledged_at timestamp [null]
+  resolved_at timestamp [null]
+  notes text [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (payment_schedule_id)
+    (client_id)
+    (status)
+    (notice_date)
+  }
+}
+
+Table credit_assessments {
+  id bigint [pk, increment]
+  client_id bigint [ref: > clients.id]
+  lease_application_id bigint [null, ref: > lease_applications.id]
+  assessment_type enum('initial', 'periodic', 'special')
+  credit_score int [null]
+  risk_rating enum('low', 'medium', 'high', 'very_high')
+  income_verification_status enum('verified', 'partial', 'unverified')
+  employment_verification_status enum('verified', 'partial', 'unverified')
+  debt_to_income_ratio decimal(5,2) [null]
+  payment_history_score int [null]
+  recommended_credit_limit decimal(15,2) [null]
+  assessment_notes text [null]
+  assessed_by bigint [ref: > users.id]
+  assessment_date date
+  valid_until date [null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+
+  indexes {
+    (client_id)
+    (assessment_date)
+    (risk_rating)
+  }
+}
+
+Table marketing_campaigns {
+  id bigint [pk, increment]
+  name varchar(255)
+  description text [null]
+  campaign_type enum('sms', 'email', 'social_media', 'print', 'radio', 'tv', 'online')
+  target_audience json [null] // Criteria for targeting
+  budget decimal(10,2) [null]
+  start_date date
+  end_date date
+  status enum('draft', 'active', 'paused', 'completed', 'cancelled') [default: 'draft']
+  created_by bigint [ref: > users.id]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+}
+
+Table campaign_responses {
+  id bigint [pk, increment]
+  campaign_id bigint [ref: > marketing_campaigns.id]
+  client_id bigint [null, ref: > clients.id]
+  response_type enum('view', 'click', 'inquiry', 'application', 'conversion')
+  response_date timestamp [default: `now()`]
+  source_channel varchar(100) [null]
+  metadata json [null]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    (campaign_id)
+    (client_id)
+    (response_type)
+    (response_date)
+  }
+}
+
+// ===== BUSINESS INTELLIGENCE VIEWS (represented as tables) =====
+
+Table dashboard_metrics {
+  id bigint [pk, increment]
+  metric_name varchar(255)
+  metric_value decimal(15,2)
+  metric_type enum('count', 'sum', 'average', 'percentage', 'ratio')
+  period_type enum('daily', 'weekly', 'monthly', 'quarterly', 'yearly')
+  period_start date
+  period_end date
+  metadata json [null]
+  created_at timestamp [default: `now()`]
+
+  indexes {
+    (metric_name, period_start, period_end) [unique]
+    (period_type)
+  }
+}
+
+// ===== ADDITIONAL RELATIONSHIPS =====
+
+// User Profile Relationships
+Ref: users.current_team_id > users.id
+
+// Manufacturer Relationships
+Ref: manufacturer_contacts.manufacturer_id > manufacturers.id [delete: cascade]
+
+// Product Relationships
+Ref: products.manufacturer_id > manufacturers.id [delete: cascade]
+Ref: products.category_id > product_categories.id
+Ref: inventory.product_id > products.id [delete: cascade]
+
+// Client Relationships
+Ref: client_references.client_id > clients.id [delete: cascade]
+Ref: client_dependents.client_id > clients.id [delete: cascade]
+Ref: payment_methods.client_id > clients.id [delete: cascade]
+
+// Lease Relationships
+Ref: lease_applications.client_id > clients.id
+Ref: lease_applications.product_id > products.id
+Ref: guarantors.lease_application_id > lease_applications.id [delete: cascade]
+Ref: lease_agreements.client_id > clients.id
+Ref: lease_agreements.product_id > products.id
+Ref: lease_agreements.manufacturer_id > manufacturers.id
+Ref: payment_schedules.lease_agreement_id > lease_agreements.id [delete: cascade]
+
+<!--// Delivery Relationships
+Ref: delivery_agents.zone_id > delivery_zones.id
+Ref: deliveries.lease_agreement_id > lease_agreements.id
+Ref: deliveries.delivery_agent_id > delivery_agents.id
+Ref: deliveries.delivery_zone_id > delivery_zones.id
+Ref: delivery_tracking.delivery_id > deliveries.id [delete: cascade]-->
+
+// Financial Relationships
+Ref: payments.lease_agreement_id > lease_agreements.id
+Ref: payments.payment_schedule_id > payment_schedules.id
+Ref: payments.client_id > clients.id
+Ref: commissions.manufacturer_id > manufacturers.id
+Ref: commissions.lease_agreement_id > lease_agreements.id
+Ref: commissions.payment_id > payments.id
+Ref: journal_entry_lines.journal_entry_id > journal_entries.id [delete: cascade]
+Ref: journal_entry_lines.account_id > accounts.id
+
+// Communication Relationships
+Ref: messages.sender_id > users.id
+Ref: messages.recipient_id > users.id
+
+// Reporting Relationships
+Ref: reports.created_by > users.id
+Ref: report_executions.report_id > reports.id [delete: cascade]
+Ref: report_executions.executed_by > users.id
+
+// Business Feature Relationships
+Ref: maintenance_schedules.lease_agreement_id > lease_agreements.id
+Ref: insurance_policies.lease_agreement_id > lease_agreements.id
+Ref: late_payment_notices.payment_schedule_id > payment_schedules.id
+Ref: late_payment_notices.lease_agreement_id > lease_agreements.id
+Ref: late_payment_notices.client_id > clients.id
+Ref: late_payment_notices.sent_by > users.id
+Ref: credit_assessments.client_id > clients.id
+Ref: credit_assessments.lease_application_id > lease_applications.id
+Ref: credit_assessments.assessed_by > users.id
+Ref: marketing_campaigns.created_by > users.id
+Ref: campaign_responses.campaign_id > marketing_campaigns.id
+Ref: campaign_responses.client_id > clients.id
