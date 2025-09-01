@@ -5,6 +5,8 @@ use App\Livewire\Settings\Password;
 use App\Livewire\Settings\Profile;
 use Illuminate\Support\Facades\Route;
 
+ds()->routes();
+
 Route::get('/', function () {
     return view('welcome');
 })->name('home');

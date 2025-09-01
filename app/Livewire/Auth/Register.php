@@ -9,8 +9,10 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use LaraDumps\LaraDumps\Livewire\Attributes\Ds;
 
 #[Layout('components.layouts.auth')]
+#[Ds]
 class Register extends Component
 {
     public string $name = '';
